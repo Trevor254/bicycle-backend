@@ -10,6 +10,10 @@ class Bicycle(db.Model):
     brand = db.Column(db.String(100), nullable=False)
     color = db.Column(db.String(50))
     image_url = db.Column(db.String(255))
+    # models.py or inside app.py if using a single file
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user = db.relationship('User', back_populates='bicycles')
+
 
     maintenance_logs = db.relationship('MaintenanceLog', backref='bicycle', cascade="all, delete-orphan", lazy=True)
     rides = db.relationship('Ride', backref='bicycle', cascade="all, delete-orphan", lazy=True)  # New relationship
@@ -22,7 +26,8 @@ class Bicycle(db.Model):
             "color": self.color,
             "imageUrl": self.image_url,
             "maintenanceLogs": [log.to_dict() for log in self.maintenance_logs],
-            "rides": [ride.to_dict() for ride in self.rides]
+            "rides": [ride.to_dict() for ride in self.rides],
+            "user_id": self.user_id
         }
 
 
@@ -51,6 +56,8 @@ class User(db.Model):
     password_hash = db.Column(db.String(128), nullable=False)
 
     rides = db.relationship('Ride', backref='user', cascade="all, delete-orphan", lazy=True)
+    bicycles = db.relationship('Bicycle', back_populates='user', cascade='all, delete-orphan')
+
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)

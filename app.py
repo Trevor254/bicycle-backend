@@ -49,11 +49,17 @@ def get_bicycles():
 @app.route("/bicycles", methods=["POST"])
 def add_bicycle():
     data = request.get_json()
+    user_id = data.get('user_id')
+
+    if not user_id:
+        return jsonify({'error': 'User ID is required'}), 400
+
     new_bike = Bicycle(
         name=data.get("name"),
         brand=data.get("brand"),
         color=data.get("color"),
-        image_url=data.get("imageUrl")
+        image_url=data.get("imageUrl"),
+        user_id= user_id  # assign user here
     )
     db.session.add(new_bike)
     db.session.commit()
