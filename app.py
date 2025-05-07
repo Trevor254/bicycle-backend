@@ -5,28 +5,31 @@ from werkzeug.utils import secure_filename
 
 from models import db, Bicycle, MaintenanceLog, User, Ride
 
+# ------------------- CONFIG ------------------- #
 app = Flask(__name__)
 
-# ✅ CORS setup for cross-origin login (with credentials)
 CORS(app, supports_credentials=True, origins=[
     "https://bicycle-collection-app-ejd5-git-main-trevor-richards-projects.vercel.app",
     "http://localhost:3001"
 ])
 
-# ✅ Config
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///bicycles.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 app.secret_key = os.environ.get("SECRET_KEY", "dev")
 
-# ✅ Required for cross-site cookies
 app.config['SESSION_COOKIE_SAMESITE'] = "None"
 app.config['SESSION_COOKIE_SECURE'] = True
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# Init DB
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# ------------------- INIT DB ------------------- #
 db.init_app(app)
 with app.app_context():
     db.create_all()
@@ -35,7 +38,6 @@ with app.app_context():
 def home():
     return jsonify({"message": "BicycleBase backend is running 🚴‍♂️"})
 
-# Serve uploaded files
 @app.route("/static/uploads/<filename>")
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
@@ -48,18 +50,25 @@ def get_bicycles():
 
 @app.route("/bicycles", methods=["POST"])
 def add_bicycle():
-    data = request.get_json()
-    user_id = data.get('user_id')
+    name = request.form.get('name')
+    brand = request.form.get('brand')
+    color = request.form.get('color')
+    user_id = request.form.get('user_id')
+    image_url = None
 
-    if not user_id:
-        return jsonify({'error': 'User ID is required'}), 400
+    image_file = request.files.get('image')
+    if image_file and allowed_file(image_file.filename):
+        filename = secure_filename(image_file.filename)
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        image_file.save(file_path)
+        image_url = f"/static/uploads/{filename}"
 
     new_bike = Bicycle(
-        name=data.get("name"),
-        brand=data.get("brand"),
-        color=data.get("color"),
-        image_url=data.get("imageUrl"),
-        user_id= user_id  # assign user here
+        name=name,
+        brand=brand,
+        color=color,
+        image_url=image_url,
+        user_id=user_id
     )
     db.session.add(new_bike)
     db.session.commit()
