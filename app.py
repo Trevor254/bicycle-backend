@@ -1,4 +1,5 @@
 import os
+import uuid
 from flask import Flask, jsonify, request, send_from_directory, session
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
@@ -13,7 +14,7 @@ CORS(app, supports_credentials=True, origins=[
     "http://localhost:3001"
 ])
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///bicycles.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
@@ -48,36 +49,46 @@ def get_bicycles():
     bikes = Bicycle.query.all()
     return jsonify([bike.to_dict() for bike in bikes]), 200
 
-from werkzeug.utils import secure_filename
-
 @app.route("/bicycles", methods=["POST"])
 def add_bicycle():
     name = request.form.get("name")
     brand = request.form.get("brand")
     color = request.form.get("color")
-    user_id = request.form.get("user_id")
     image_file = request.files.get("image")
 
-    if not all([name, brand, color, user_id, image_file]):
+    try:
+        user_id = int(request.form.get("user_id"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid or missing user_id"}), 400
+
+    if not all([name, brand, color, image_file]):
         return jsonify({"error": "Missing required fields"}), 400
 
+    if not allowed_file(image_file.filename):
+        return jsonify({"error": "Unsupported file type"}), 400
+
     filename = secure_filename(image_file.filename)
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    ext = filename.rsplit('.', 1)[1].lower()
+    unique_filename = f"{uuid.uuid4().hex}.{ext}"
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
     image_file.save(filepath)
 
-    image_url = f"/static/uploads/{filename}"
+    image_url = f"/static/uploads/{unique_filename}"
 
-    new_bike = Bicycle(
-        name=name,
-        brand=brand,
-        color=color,
-        image_url=image_url,
-        user_id=user_id
-    )
-    db.session.add(new_bike)
-    db.session.commit()
-    return jsonify(new_bike.to_dict()), 201
-
+    try:
+        new_bike = Bicycle(
+            name=name,
+            brand=brand,
+            color=color,
+            image_url=image_url,
+            user_id=user_id
+        )
+        db.session.add(new_bike)
+        db.session.commit()
+        return jsonify(new_bike.to_dict()), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
 
 @app.route("/bicycles/<int:id>", methods=["DELETE"])
 def delete_bicycle(id):
@@ -187,4 +198,4 @@ def add_ride():
     return jsonify(ride.to_dict()), 201
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, threaded=False)
