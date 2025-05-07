@@ -48,20 +48,24 @@ def get_bicycles():
     bikes = Bicycle.query.all()
     return jsonify([bike.to_dict() for bike in bikes]), 200
 
+from werkzeug.utils import secure_filename
+
 @app.route("/bicycles", methods=["POST"])
 def add_bicycle():
-    name = request.form.get('name')
-    brand = request.form.get('brand')
-    color = request.form.get('color')
-    user_id = request.form.get('user_id')
-    image_url = None
+    name = request.form.get("name")
+    brand = request.form.get("brand")
+    color = request.form.get("color")
+    user_id = request.form.get("user_id")
+    image_file = request.files.get("image")
 
-    image_file = request.files.get('image')
-    if image_file and allowed_file(image_file.filename):
-        filename = secure_filename(image_file.filename)
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        image_file.save(file_path)
-        image_url = f"/static/uploads/{filename}"
+    if not all([name, brand, color, user_id, image_file]):
+        return jsonify({"error": "Missing required fields"}), 400
+
+    filename = secure_filename(image_file.filename)
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    image_file.save(filepath)
+
+    image_url = f"/static/uploads/{filename}"
 
     new_bike = Bicycle(
         name=name,
@@ -73,6 +77,7 @@ def add_bicycle():
     db.session.add(new_bike)
     db.session.commit()
     return jsonify(new_bike.to_dict()), 201
+
 
 @app.route("/bicycles/<int:id>", methods=["DELETE"])
 def delete_bicycle(id):
