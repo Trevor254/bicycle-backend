@@ -13,7 +13,7 @@ CORS(app, supports_credentials=True, origins=[
     "http://localhost:3001"
 ])
 
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL")
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL", "sqlite:///app.db")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static', 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
@@ -55,10 +55,9 @@ def add_bicycle():
     name = request.form.get("name")
     brand = request.form.get("brand")
     color = request.form.get("color")
-    user_id = request.form.get("user_id")
     image_file = request.files.get("image")
 
-    if not all([name, brand, color, user_id, image_file]):
+    if not all([name, brand, color,image_file]):
         return jsonify({"error": "Missing required fields"}), 400
 
     filename = secure_filename(image_file.filename)
@@ -72,7 +71,6 @@ def add_bicycle():
         brand=brand,
         color=color,
         image_url=image_url,
-        user_id=user_id
     )
     db.session.add(new_bike)
     db.session.commit()
